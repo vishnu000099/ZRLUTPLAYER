@@ -38,7 +38,7 @@ export const ExportLutModal: React.FC<ExportLutModalProps> = ({
       setIsUnlocked(true);
       setPasscodeError(null);
     } else {
-      setPasscodeError('Invalid authorization passcode. Please enter the correct 10-digit passcode.');
+      setPasscodeError('Incorrect passcode. Please enter the 10-digit passcode.');
     }
   };
 
@@ -93,7 +93,7 @@ export const ExportLutModal: React.FC<ExportLutModalProps> = ({
                   </span>
                 ) : (
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#312516] text-[#e5b96f] border border-[#6b4e23] font-semibold">
-                    Passcode Protected
+                    UI Lock
                   </span>
                 )}
               </h2>
@@ -120,9 +120,9 @@ export const ExportLutModal: React.FC<ExportLutModalProps> = ({
               <div className="p-3.5 bg-[#171a25] rounded-xl border border-[#2b3245] flex items-start gap-3">
                 <Lock className="w-4 h-4 text-[#e5b96f] shrink-0 mt-0.5" />
                 <div className="flex flex-col gap-1 text-xs">
-                  <span className="font-semibold text-[#f1f5f9]">Passcode Authorization Required</span>
+                  <span className="font-semibold text-[#f1f5f9]">Passcode Required</span>
                   <span className="text-[11px] text-[#9ba1b2] leading-relaxed">
-                    This feature generates and exports calibrated production .CUBE LUT files. Please enter the authorized studio passcode to proceed.
+                    This feature generates and exports calibrated production .CUBE LUT files. Enter the passcode to unlock it. This is a UI lock only and does not protect the app or its files.
                   </span>
                 </div>
               </div>

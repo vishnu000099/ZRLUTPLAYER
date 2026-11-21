@@ -133,7 +133,7 @@ export const ColorGradingPanel: React.FC<ColorGradingPanelProps> = ({
           <button
             onClick={() => setIsExportModalOpen(true)}
             className="text-xs text-[#e5b96f] hover:text-[#f0c883] flex items-center gap-1.5 transition-colors px-2.5 py-1 rounded-lg bg-[#272016] hover:bg-[#34291a] border border-[#5c4422] cursor-pointer"
-            title="Export baked 3D LUT (.CUBE) - Passcode required"
+            title="Export baked 3D LUT (.CUBE) - passcode required (UI lock)"
           >
             <Download className="w-3.5 h-3.5 text-[#e5b96f]" />
             <span>Export .CUBE</span>
@@ -674,7 +674,7 @@ export const ColorGradingPanel: React.FC<ColorGradingPanelProps> = ({
         </span>
       </div>
 
-      {/* Export LUT Passcode Protected Modal */}
+      {/* Export LUT modal (behind a UI lock passcode) */}
       <ExportLutModal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}

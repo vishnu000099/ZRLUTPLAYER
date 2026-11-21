@@ -5,7 +5,10 @@ import {
   executeColorGradeCpu
 } from '../color/colorPipeline';
 
-export const EXPORT_LUT_PASSWORD = '0554318462';
+import { UI_LOCK_CODE } from './uiLock';
+
+/** UI lock code for the LUT export dialog (convenience lock only — see uiLock.ts). */
+export const EXPORT_LUT_PASSWORD = UI_LOCK_CODE;
 
 // Re-export for any modules that import from lutExporter
 export { applyColorAdjustmentsCpu };

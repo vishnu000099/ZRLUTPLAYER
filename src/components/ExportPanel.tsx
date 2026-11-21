@@ -37,7 +37,10 @@ import { exportGradedVideo } from '../utils/videoExporter';
 import { detectEncoderCapabilities } from '../utils/encoderCapabilities';
 import { detectSourceVideoFps, formatFpsDisplay } from '../utils/fpsDetector';
 
-const MASTER_EXPORT_PASSCODE = '0554318462';
+import { UI_LOCK_CODE } from '../utils/uiLock';
+
+// Convenience UI lock only — not a security control (see utils/uiLock.ts).
+const MASTER_EXPORT_PASSCODE = UI_LOCK_CODE;
 
 interface ExportPanelProps {
   videoElement: HTMLVideoElement | null;
@@ -58,7 +61,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
   activeLut,
   lutEnabled,
 }) => {
-  // Passcode Security State
+  // UI lock state (convenience lock, not a security control)
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
     return sessionStorage.getItem('nikon_zr_export_unlocked') === 'true';
   });
@@ -187,7 +190,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
       setPasscodeError(null);
       setPasscodeInput('');
     } else {
-      setPasscodeError('Incorrect passcode. Access denied.');
+      setPasscodeError('Incorrect passcode. Please try again.');
     }
   };
 
@@ -287,7 +290,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
     });
   };
 
-  // LOCKED STATE: Passcode Prompt for 0554318462
+  // LOCKED STATE: UI lock passcode prompt
   if (!isUnlocked) {
     return (
       <div className="flex flex-col gap-4 text-[#e2e6ef] pb-6 select-none">
@@ -298,10 +301,10 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
 
           <div className="flex flex-col gap-1 max-w-[320px]">
             <span className="text-base font-bold text-[#f4f6fa] tracking-tight">
-              Export Video Protected
+              Export Video Locked
             </span>
             <span className="text-xs text-[#8a92a5]">
-              Please enter the authorization passcode to access the export module.
+              Enter the passcode to unlock the export panel.
             </span>
           </div>
 
@@ -350,7 +353,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
           </form>
 
           <span className="text-[10px] text-[#5e6678] font-mono">
-            Secure Studio Lock · Protected
+            UI lock only · does not protect the app or its files
           </span>
         </div>
       </div>
@@ -381,7 +384,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
           type="button"
           onClick={handleLockExport}
           className="p-1.5 rounded-lg bg-[#1a1d26] hover:bg-[#252936] text-[#828a9b] hover:text-[#e5b96f] border border-[#282c3c] transition-colors"
-          title="Lock Export Video (Requires passcode)"
+          title="Lock the Export Video panel (UI lock)"
         >
           <Lock className="w-3.5 h-3.5" />
         </button>

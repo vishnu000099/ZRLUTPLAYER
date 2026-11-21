@@ -101,12 +101,14 @@ function ffprobe(file) {
 async function waitForDownload(predicate, timeoutMs) {
   const t0 = Date.now();
   while (Date.now() - t0 < timeoutMs) {
-    const files = fs.readdirSync(DL).filter((f) => !f.endsWith('.crdownload') && predicate(f));
+    const files = fs.readdirSync(DL).filter((f) => { try { return !f.endsWith('.crdownload') && predicate(f); } catch { return false; } });
     for (const f of files) {
       const p = path.join(DL, f);
-      const s1 = fs.statSync(p).size;
-      await sleep(500);
-      if (s1 > 0 && fs.statSync(p).size === s1) return p;
+      try {
+        const s1 = fs.statSync(p).size;
+        await sleep(1500);
+        if (s1 > 0 && fs.statSync(p).size === s1) return p;
+      } catch { /* file renamed mid-poll; retry */ }
     }
     await sleep(1000);
   }
@@ -179,11 +181,18 @@ async function runExportInner(engine, expectAudio) {
   await unlockExportIfNeeded();
   await page.getByRole('button', { name: engine === 'hardware' ? /Hardware Accelerated/ : /Software CPU/ }).first().click();
   await page.locator('button[title^="Fast 5-second test render"]').click();
+  // Move earlier exports aside so identical output names can't collide.
+  const prev = path.join(DL, 'previous'); fs.mkdirSync(prev, { recursive: true });
+  for (const f of fs.readdirSync(DL)) if (f.endsWith('.mp4')) fs.renameSync(path.join(DL, f), path.join(prev, `${Date.now()}_${f}`));
   const before = new Set(fs.readdirSync(DL));
   await page.getByRole('button', { name: /Start Exporting Graded Video/ }).click();
   const t0 = Date.now();
   const file = await waitForDownload((f) => f.endsWith('.mp4') && (!before.has(f) || fs.statSync(path.join(DL, f)).mtimeMs > t0), 300000);
-  if (engine === 'hardware') assert(/_hw_/.test(path.basename(file)), 'hardware engine fell back to CPU: ' + (warnings.filter((w) => /fall|error|Error/.test(w)).slice(-1)[0] || '').slice(0, 300));
+  let usedEngine = /_hw_/.test(path.basename(file)) ? 'hardware' : 'cpu-fallback';
+  if (engine === 'hardware' && usedEngine !== 'hardware') {
+    const hwAvailable = await page.evaluate(async () => (await VideoEncoder.isConfigSupported({ codec: 'avc1.640028', width: 1920, height: 1080, bitrate: 1e7, framerate: 30, hardwareAcceleration: 'prefer-hardware' })).supported);
+    assert(!hwAvailable, 'hardware encoder is available but export fell back to CPU');
+  }
   const info = ffprobe(file);
   const v = info.streams.find((s) => s.codec_type === 'video');
   const a = info.streams.find((s) => s.codec_type === 'audio');
@@ -194,7 +203,7 @@ async function runExportInner(engine, expectAudio) {
   // Reset panel for the next export
   const again = page.locator('button[title="Export another video"]');
   if (await again.count()) await again.click();
-  return { file, detail: `${path.basename(file)} · ${v.codec_name} ${v.width}x${v.height} ${v.pix_fmt} · ${dur.toFixed(2)}s · audio=${a ? a.codec_name : 'none'} · ${(Number(info.format.size) / 1e6).toFixed(1)} MB` };
+  return { file, detail: `[${engine === 'hardware' ? usedEngine : 'cpu'}] ${path.basename(file)} · ${v.codec_name} ${v.width}x${v.height} ${v.pix_fmt} · ${dur.toFixed(2)}s · audio=${a ? a.codec_name : 'none'} · ${(Number(info.format.size) / 1e6).toFixed(1)} MB` };
 }
 
 // ------------------------------------------------------------------ tests
@@ -316,6 +325,9 @@ await test('lut-export-cube', async () => {
   await page.getByRole('button', { name: /Export \.CUBE/ }).first().click();
   await sleep(500);
   const pass = page.locator('input[type="password"], input[placeholder*="asscode"]');
+  const modalText = await page.evaluate(() => document.body.innerText);
+  assert(/UI lock only/.test(modalText) && /UI Lock/.test(modalText), 'LUT dialog UI-lock wording missing');
+  assert(!/Passcode Protected|authoriz/i.test(modalText), 'LUT dialog still claims protection');
   if (await pass.count()) { await pass.first().fill('0554318462'); await sleep(300); if (await pass.count()) await pass.first().press('Enter'); await sleep(500); }
   const before = new Set(fs.readdirSync(DL));
   await page.getByRole('button', { name: /Download \.CUBE LUT/ }).click();
@@ -328,6 +340,23 @@ await test('lut-export-cube', async () => {
   if (await cancel.count()) await cancel.first().click();
   await sleep(300);
   return `${path.basename(f)} LUT_3D_SIZE ${size}, ${rows} rows`;
+});
+
+await test('ui-lock-wording', async () => {
+  await page.evaluate(() => sessionStorage.removeItem('nikon_zr_export_unlocked'));
+  await openTab('Export video');
+  const lockBtn = page.locator('button[title="Lock the Export Video panel (UI lock)"]');
+  if (await lockBtn.count()) { await lockBtn.click(); await sleep(400); }
+  const text = await page.evaluate(() => document.body.innerText);
+  assert(/Export Video Locked/.test(text), 'locked panel title missing');
+  assert(/UI lock only/.test(text), 'UI-lock disclaimer missing');
+  assert(!/Protected|Access denied|authoriz|Secure Studio/i.test(text), 'security claim still visible');
+  await page.getByPlaceholder('Enter passcode').fill('1111111111'); await page.getByPlaceholder('Enter passcode').press('Enter'); await sleep(300);
+  const wrong = await page.getByText('Incorrect passcode. Please try again.').count();
+  assert(wrong === 1, 'wrong-code message not shown');
+  await page.getByPlaceholder('Enter passcode').fill('0554318462'); await page.getByPlaceholder('Enter passcode').press('Enter'); await sleep(400);
+  assert(await page.getByRole('button', { name: /Start Exporting Graded Video/ }).count() === 1, 'correct code did not unlock');
+  return 'locked/disclaimer/wrong-code/unlock behave as before; no security claims shown';
 });
 
 await test('export-webcodecs-hw', async () => {
