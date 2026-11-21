@@ -1,0 +1,17 @@
+import { _electron } from 'playwright-core';
+import electronPath from 'electron';
+const app = await _electron.launch({ executablePath: process.env.ZR_ELECTRON_EXE || electronPath, args: ['.'], env: { ...process.env, ZR_TEST_DOWNLOAD_DIR: process.cwd() + '/test-output/downloads' } });
+const page = await app.firstWindow();
+app.process().stdout.on('data', d => process.stdout.write('[main] ' + d));
+app.process().stderr.on('data', d => { const s = String(d); if (s.includes('[zr]')) process.stdout.write('[main] ' + s); });
+const logs = [];
+page.on('console', m => logs.push(`[${m.type()}] ${m.text()}`));
+page.on('response', r => { if (r.status() >= 400) logs.push('[HTTP ' + r.status() + '] ' + r.url()); });
+page.on('pageerror', e => logs.push(`[pageerror] ${e.message}`));
+page.on('request', r => { if (!r.url().startsWith('app://') && !r.url().startsWith('blob:') && !r.url().startsWith('data:')) logs.push('[EXTERNAL] ' + r.url()); });
+await page.waitForLoadState('load'); await page.waitForTimeout(3000);
+console.log('title:', await page.title(), 'url:', page.url());
+console.log(await page.evaluate(() => JSON.stringify({ desk: window.zrDesktop, node: typeof require, proc: typeof process, fonts: [...document.fonts].filter(f=>f.status==='loaded').map(f=>f.family+' '+f.weight) })));
+await page.screenshot({ path: 'test-output/smoke.png' });
+console.log(logs.join('\n'));
+await app.close();

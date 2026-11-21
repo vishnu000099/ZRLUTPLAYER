@@ -124,18 +124,17 @@ export async function getFFmpeg(onLog?: (msg: string) => void): Promise<FFmpeg> 
     }
   });
 
+  // Load the FFmpeg core bundled with the app (/public/ffmpeg/). The desktop app runs
+  // fully offline, so there is intentionally no CDN fallback.
   try {
-    // 1. First attempt to load local bundled core from /public/ffmpeg/
     const coreURL = await toBlobURL('/ffmpeg/ffmpeg-core.js', 'text/javascript');
     const wasmURL = await toBlobURL('/ffmpeg/ffmpeg-core.wasm', 'application/wasm');
     await ffmpeg.load({ coreURL, wasmURL });
   } catch (err) {
-    console.warn('Local ffmpeg load failed, attempting CDN fallback:', err);
-    // 2. Fallback to jsDelivr CDN
-    const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm';
-    const coreURL = await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript');
-    const wasmURL = await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm');
-    await ffmpeg.load({ coreURL, wasmURL });
+    console.error('Bundled FFmpeg core failed to load:', err);
+    throw new Error(
+      `CPU encoder (FFmpeg) could not be loaded from the application bundle: ${err instanceof Error ? err.message : String(err)}`
+    );
   }
 
   ffmpegInstance = ffmpeg;
