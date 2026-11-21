@@ -686,19 +686,36 @@ export async function exportCpuGradedVideo(options: VideoExportOptions): Promise
           engine: 'cpu'
         });
 
-        await ffmpeg.writeFile('source_media.mp4', await fetchFile(sourceFile));
-        createdTempFiles.add('source_media.mp4');
+        // Mount the source read-only (WORKERFS) so FFmpeg reads only what it needs,
+        // instead of copying the whole (possibly multi-GB) file into WASM memory.
+        let audioInputPath = 'source_media.mp4';
+        let mountedSourceDir: string | null = null;
+        try {
+          mountedSourceDir = '/zr_src';
+          await ffmpeg.createDir(mountedSourceDir).catch(() => {});
+          await ffmpeg.mount('WORKERFS' as any, { files: [sourceFile as File] }, mountedSourceDir);
+          audioInputPath = `${mountedSourceDir}/${(sourceFile as File).name}`;
+        } catch (mountErr) {
+          console.warn('WORKERFS mount unavailable, copying source into memory:', mountErr);
+          mountedSourceDir = null;
+          await ffmpeg.writeFile('source_media.mp4', await fetchFile(sourceFile));
+          createdTempFiles.add('source_media.mp4');
+        }
 
         const audioArgs = [
           '-ss', String(startTime),
           '-t', String(rangeDuration),
-          '-i', 'source_media.mp4',
+          '-i', audioInputPath,
           '-vn',
           '-c:a', 'aac',
           '-b:a', '256k',
           'audio_track.aac'
         ];
         const res = await ffmpeg.exec(audioArgs);
+        if (mountedSourceDir) {
+          await ffmpeg.unmount(mountedSourceDir).catch(() => {});
+          await ffmpeg.deleteDir(mountedSourceDir).catch(() => {});
+        }
         if (res === 0) {
           createdTempFiles.add('audio_track.aac');
           hasAudioTrack = true;

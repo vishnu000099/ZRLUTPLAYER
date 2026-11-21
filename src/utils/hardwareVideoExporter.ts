@@ -465,9 +465,19 @@ export async function exportHardwareGradedVideo(
           engine: 'hardware'
         });
 
+        // Mediabunny needs the source decoder config with the first packet, and audio
+        // timestamps must be rebased to the export range like the video frames are.
+        const audioDecoderConfig = await audioInputTrack.getDecoderConfig();
+        let isFirstAudioPacket = true;
         for await (const packet of audioSink.packets()) {
           if (packet.timestamp >= startTime && packet.timestamp <= endTime) {
-            await audioSource.add(packet);
+            const rebased = packet.clone({ timestamp: Math.max(0, packet.timestamp - startTime) });
+            if (isFirstAudioPacket && audioDecoderConfig) {
+              await audioSource.add(rebased, { decoderConfig: audioDecoderConfig });
+              isFirstAudioPacket = false;
+            } else {
+              await audioSource.add(rebased);
+            }
           }
           if (packet.timestamp > endTime) break;
         }
