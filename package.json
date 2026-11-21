@@ -14,8 +14,8 @@
     "build:desktop": "vite build && node scripts/build-electron.mjs",
     "electron:start": "npm run build:desktop && electron .",
     "test:electron": "node scripts/electron-test.mjs",
-    "dist:win": "npm run build:desktop && electron-builder --win nsis portable --x64",
-    "dist:mac": "npm run build:desktop && electron-builder --mac dmg --x64 --arm64"
+    "dist:win": "npm run build:desktop && electron-builder --win nsis portable --x64 --publish never",
+    "dist:mac": "npm run build:desktop && electron-builder --mac dmg --x64 --arm64 --publish never"
   },
   "dependencies": {
     "@ffmpeg/core": "^0.12.10",
