@@ -187,7 +187,7 @@ async function runExportInner(engine, expectAudio) {
   const before = new Set(fs.readdirSync(DL));
   await page.getByRole('button', { name: /Start Exporting Graded Video/ }).click();
   const t0 = Date.now();
-  const file = await waitForDownload((f) => f.endsWith('.mp4') && (!before.has(f) || fs.statSync(path.join(DL, f)).mtimeMs > t0), 300000);
+  const file = await waitForDownload((f) => f.endsWith('.mp4') && (!before.has(f) || fs.statSync(path.join(DL, f)).mtimeMs > t0), Number(process.env.ZR_EXPORT_TIMEOUT_MS || 300000));
   let usedEngine = /_hw_/.test(path.basename(file)) ? 'hardware' : 'cpu-fallback';
   if (engine === 'hardware' && usedEngine !== 'hardware') {
     const hwAvailable = await page.evaluate(async () => (await VideoEncoder.isConfigSupported({ codec: 'avc1.640028', width: 1920, height: 1080, bitrate: 1e7, framerate: 30, hardwareAcceleration: 'prefer-hardware' })).supported);

@@ -28,12 +28,33 @@ The original React + Vite app is unchanged in structure; Electron wraps it.
 - `public/assets/aistudio/` (78 MB of AI Studio assets) stays in the project but is excluded
   from installers (`electron-builder.yml`).
 
+## Export passcode = UI lock (not security)
+
+The Export Video panel and the .CUBE export dialog keep their passcode screens, but the code
+(`src/utils/uiLock.ts`) ships inside the app and anyone can read it. It is a convenience UI lock
+only; it does not protect the application, its LUTs or exported files, and the UI says so.
+
+## Building the macOS DMGs (GitHub Actions)
+
+1. Push this project to a GitHub repository (the workflow is `.github/workflows/desktop-build.yml`).
+2. On GitHub: **Actions → Desktop build → Run workflow** (or push a tag such as `v1.0.0`).
+3. When the run finishes, download the **macos-dmg** artifact. It contains
+   `Nikon-ZR-LUT-Player-1.0.0-mac-x64.dmg` (Intel) and `Nikon-ZR-LUT-Player-1.0.0-mac-arm64.dmg`
+   (Apple Silicon). The **windows-installers** artifact contains the Windows builds.
+4. Without secrets the DMGs are unsigned: on first launch, right-click the app → **Open**.
+   For signed and notarized builds, add these repository secrets (Settings → Secrets and variables
+   → Actions): `CSC_LINK` (base64 Developer ID Application .p12), `CSC_KEY_PASSWORD`, `APPLE_ID`,
+   `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`.
+
+On a Mac you can also build locally: `npm ci && npm run dist:mac`.
+
 ## Known limitations
 
-- **Hardware (WebCodecs) encoding on Windows:** Electron 45's sandboxed GPU process reports no
-  hardware encoders on the test machine (Chrome 157 on the same machine does). The app
-  automatically falls back to the FFmpeg CPU encoder, which works (with audio) but is about 10×
-  slower at 4K. Re-test with newer Electron releases.
+- **Hardware (WebCodecs) encoding on Windows:** with Electron's GPU sandbox enabled, no hardware
+  video encoders are exposed on the test machine. Tested on Electron 45.4.1 (latest stable,
+  Chromium 156) and 46.0.0-alpha.12 (Chromium 160); Chrome 157 on the same machine does expose
+  them. By decision the GPU sandbox stays on: the app automatically falls back to the FFmpeg CPU
+  encoder, which works (with audio) but is roughly 10× slower at 4K. Re-test when upgrading Electron.
 - **Unsigned builds:** Windows SmartScreen and macOS Gatekeeper will warn until the builds are
   code-signed (Windows certificate; Apple Developer ID + notarization).
 - **Exports are assembled in memory** before saving (existing app design). Very long exports need
