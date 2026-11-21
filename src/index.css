@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-primary: #0e1014;
+    --panel-bg: #16181f;
+    --panel-border: #282b36;
+    --nikon-gold: #e5b96f;
+  }
+
+  body {
+    background-color: #0e1014;
+    color: #eceef2;
+  }
+}
+
+/* Custom range styling */
+input[type="range"] {
+  accent-color: #e5b96f;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  cursor: pointer;
+}
+
+/* Custom dark scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #111318;
+}
+::-webkit-scrollbar-thumb {
+  background: #282c38;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3b4050;
+}

@@ -1,0 +1,8 @@
+{
+  "name": "Nikon ZR LUT Player",
+  "description": "LUT video player and proxy colorist viewer for Nikon ZR footage with real-time .cube LUT grading, split-screen comparison",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

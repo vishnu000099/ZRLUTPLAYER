@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nikon ZR LUT Player</title>
+<style>
+:root{color-scheme:dark;--bg:#17181c;--panel:#202228;--panel2:#282b32;--line:#383c45;--text:#eceef2;--muted:#9ba1ad;--gold:#e5b96f;--red:#e06464}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at top,#24262c 0,#17181c 52%);color:var(--text);font:14px/1.45 "Segoe UI",Arial,sans-serif;min-height:100vh}
+.app{max-width:1600px;margin:auto;padding:18px 22px 24px;display:flex;flex-direction:column;gap:14px;min-height:100vh}
+header{display:flex;align-items:center;gap:14px;min-height:52px}
+.brand-icon{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:#312a20;color:var(--gold);font-size:22px}
+.brand h1{font-size:18px;letter-spacing:1.4px;margin:0;font-weight:750}
+.brand p{font-size:10px;letter-spacing:2px;color:var(--muted);margin:2px 0 0}
+.file-status{margin-left:auto;color:var(--muted);max-width:48%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.toolbar,.panel{background:linear-gradient(180deg,#22242a,#1d1f24);border:1px solid #343740;border-radius:13px;padding:12px;box-shadow:0 10px 30px #0002}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button,.file-button,select{font:inherit;color:var(--text);background:#2b2e36;border:1px solid #414550;border-radius:8px;padding:9px 13px;cursor:pointer;transition:background .15s,border .15s}
+button:hover,.file-button:hover,select:hover{background:#383c46;border-color:#626876}
+button.primary{background:#5b482d;border-color:#8a6c3f;color:#fff2d7}
+button:disabled{opacity:.45;cursor:not-allowed}
+input[type=file]{display:none}
+.spacer{flex:1}
+.pill{border:1px solid #454955;border-radius:99px;padding:5px 9px;color:#c5cad3;font-size:11px}
+.pill.on{color:#f7d89c;border-color:#8a6c3f;background:#3b3021}
+.stage{position:relative;flex:1;min-height:360px;background:#090a0c;border:1px solid #343740;border-radius:13px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+#glcanvas{display:block;width:100%;height:100%;min-height:360px;object-fit:contain}
+.stage-hint{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#8e949f;text-align:center;pointer-events:none;padding:24px}
+.stage-hint .glyph{font-size:42px;color:#6f747e}
+.stage-hint strong{color:#c8cbd2;font-size:16px}
+.stage-hint small{max-width:460px;line-height:1.6}
+.transport{display:grid;grid-template-columns:auto auto auto minmax(0,1fr) auto;align-items:center;gap:12px;width:100%}
+.time{font-variant-numeric:tabular-nums;color:#aeb4bf;font-size:12px;min-width:42px}
+input[type=range]{width:100%;min-width:0;accent-color:var(--gold);cursor:pointer}
+.settings{display:grid;grid-template-columns:minmax(220px,1fr) minmax(220px,1fr) minmax(220px,1fr);gap:12px}
+.card{background:#202228;border:1px solid #343740;border-radius:12px;padding:13px;min-width:0}
+.card-title{font-size:11px;text-transform:uppercase;letter-spacing:1.3px;color:#a6acb7;margin-bottom:10px}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.lut-name{color:var(--gold);font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.muted{color:var(--muted);font-size:12px}
+.strength{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;margin-top:10px}
+.check{display:flex;align-items:center;gap:8px;color:#d7dae0;cursor:pointer}
+.check input{accent-color:var(--gold);width:16px;height:16px}
+select{max-width:100%}
+footer{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:#777e8a;font-size:11px;padding:0 3px}
+kbd{background:#292c33;border:1px solid #454955;border-radius:4px;padding:1px 5px;color:#c4c8d0}
+#status{color:#a9aeb8}
+@media(max-width:850px){.settings{grid-template-columns:1fr}.file-status{max-width:40%}.app{padding:12px}.stage{min-height:280px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand-icon">◉</div>
+    <div class="brand"><h1>ZR LUT PLAYER</h1><p>NIKON PROXY VIEWER</p></div>
+    <div class="file-status" id="fileStatus">No video loaded</div>
+  </header>
+
+  <div class="toolbar">
+    <label class="file-button primary" for="videoInput">▣ Open Video</label>
+    <input id="videoInput" type="file" accept="video/*,.mp4,.mov,.m4v,.mkv,.webm">
+    <label class="file-button" for="lutInput">＋ Load .cube LUT</label>
+    <input id="lutInput" type="file" accept=".cube,text/plain">
+    <button id="clearLut">Clear LUT</button>
+    <button id="analyzeBtn" class="primary" title="Run a short playback test and recommend a mode">⏱ Recommend Playback</button>
+    <label class="muted" for="playbackMode">Processing</label>
+    <select id="playbackMode" title="Choose playback processing resolution">
+      <option value="original">Original</option>
+      <option value="1080">1080p</option>
+      <option value="720">720p</option>
+    </select>
+    <span class="spacer"></span>
+    <span id="gpuBadge" class="pill">GPU LUT: checking…</span>
+    <button id="fullscreenBtn">⛶ Fullscreen</button>
+  </div>
+
+  <main class="stage" id="stage">
+    <canvas id="glcanvas" aria-label="Video preview canvas"></canvas>
+    <div class="stage-hint" id="hint">
+      <div class="glyph">▣</div>
+      <strong>Open a Nikon ZR proxy video</strong>
+      <small>Select an H.264 MP4/MOV file. Load a compatible 3D <code>.cube</code> LUT to preview your grade. You can also drag a video file into this window.</small>
+    </div>
+  </main>
+
+  <section class="panel">
+    <div class="transport">
+      <button id="playBtn" title="Play or pause">▶ Play</button>
+      <button id="stopBtn" title="Stop playback">■ Stop</button>
+      <span class="time" id="currentTime">00:00</span>
+      <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Seek video">
+      <span class="time" id="duration">00:00</span>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <label class="check"><input type="checkbox" id="lutEnabled" checked> Enable LUT</label>
+      <label class="check"><input type="checkbox" id="splitEnabled"> Split-screen before / after</label>
+      <span class="spacer"></span>
+      <label class="muted" for="splitPosition">Split position</label>
+      <input id="splitPosition" type="range" min="10" max="90" value="50" style="max-width:160px" aria-label="Split position">
+      <span id="splitValue" class="muted">50%</span>
+    </div>
+  </section>
+
+  <section class="settings">
+    <div class="card">
+      <div class="card-title">Selected LUT</div>
+      <div class="row"><span class="lut-name" id="lutName">No LUT loaded</span><span class="pill" id="lutStatus">OFF</span></div>
+      <div class="muted" id="lutDetails" style="margin-top:8px">Supports common 3D .cube LUTs with LUT_3D_SIZE.</div>
+      <div class="strength">
+        <label class="muted" for="strength">Strength</label>
+        <input id="strength" type="range" min="0" max="100" value="100">
+        <span id="strengthValue" class="muted">100%</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Playback</div>
+      <div class="row">
+        <label class="muted" for="speed">Speed</label>
+        <select id="speed">
+          <option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="0.75">0.75×</option><option value="1" selected>1× Normal</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option>
+        </select>
+        <label class="muted" for="volume">Volume</label>
+        <input id="volume" type="range" min="0" max="100" value="80" style="max-width:120px">
+      </div>
+      <div class="muted" style="margin-top:10px">Keyboard: <kbd>Space</kbd> play/pause · <kbd>←</kbd>/<kbd>→</kbd> seek 5 seconds · <kbd>F</kbd> fullscreen</div>
+      <div id="analysisResult" class="muted" style="margin-top:9px;padding:9px 10px;background:#191b20;border:1px solid #343740;border-radius:8px">Open a video, then choose Recommend Playback for a short real-world playback test.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Color workflow</div>
+      <div class="muted">The LUT is applied to the decoded video RGB values. This player does not automatically detect Log gamma or perform a camera color-space conversion. Select a LUT designed for your proxy input, or use a LUT that includes the required technical transform.</div>
+    </div>
+  </section>
+  <footer><span id="status">Ready · Video and audio play locally in your browser.</span><span>Single-file HTML · WebGL 3D LUT preview · No upload or internet connection required</span></footer>
+</div>
+
+<video id="video" playsinline preload="metadata" style="display:none"></video>
+<script>
+(() => {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const video = $("video"), canvas = $("glcanvas"), gl = canvas.getContext("webgl", {alpha:false, antialias:false, preserveDrawingBuffer:false});
+  let videoUrl = null, currentFile = null, lutTexture = null, lutSize = 0, lutDomainMin = [0,0,0], lutDomainMax = [1,1,1], lutLoaded = false;
+  let program = null, positionBuffer = null, texture = null, lastW = 0, lastH = 0, raf = 0;
+  let playbackMode = "original";
+  const downscaleCanvas = document.createElement("canvas");
+  const downscaleCtx = downscaleCanvas.getContext("2d", {alpha:false, desynchronized:true});
+  const state = {lutEnabled:true, split:false, splitPos:0.5, strength:1, volume:0.8};
+  const vertexShader = `
+    attribute vec2 a_position;
+    varying vec2 v_uv;
+    void main(){ v_uv=(a_position+1.0)*0.5; gl_Position=vec4(a_position,0.0,1.0); }
+  `;
+  const fragmentShader = `
+    precision highp float;
+    varying vec2 v_uv;
+    uniform sampler2D u_video;
+    uniform sampler2D u_lut;
+    uniform float u_lutSize;
+    uniform vec3 u_domainMin;
+    uniform vec3 u_domainMax;
+    uniform float u_lutOn;
+    uniform float u_strength;
+    uniform float u_split;
+    uniform float u_splitPos;
+    uniform vec2 u_videoSize;
+    uniform vec2 u_canvasSize;
+
+    vec3 sampleLut(vec3 color) {
+      vec3 span=max(u_domainMax-u_domainMin, vec3(0.000001));
+      vec3 c=clamp((color-u_domainMin)/span,0.0,1.0)*(u_lutSize-1.0);
+      vec3 lo=floor(c), hi=min(lo+1.0,vec3(u_lutSize-1.0)), f=fract(c);
+      // LUT is packed into a 2D texture as blue slices arranged left-to-right.
+      float x0=(lo.b*u_lutSize+lo.r+0.5)/(u_lutSize*u_lutSize);
+      float x1=(hi.b*u_lutSize+hi.r+0.5)/(u_lutSize*u_lutSize);
+      float y0=(lo.g+0.5)/u_lutSize;
+      float y1=(hi.g+0.5)/u_lutSize;
+      float xb0=(lo.b*u_lutSize+lo.r+0.5)/(u_lutSize*u_lutSize);
+      float xb1=(lo.b*u_lutSize+hi.r+0.5)/(u_lutSize*u_lutSize);
+      float xt0=(hi.b*u_lutSize+lo.r+0.5)/(u_lutSize*u_lutSize);
+      float xt1=(hi.b*u_lutSize+hi.r+0.5)/(u_lutSize*u_lutSize);
+      vec3 c000=texture2D(u_lut,vec2(xb0,y0)).rgb;
+      vec3 c100=texture2D(u_lut,vec2(xb1,y0)).rgb;
+      vec3 c010=texture2D(u_lut,vec2(xb0,y1)).rgb;
+      vec3 c110=texture2D(u_lut,vec2(xb1,y1)).rgb;
+      vec3 c001=texture2D(u_lut,vec2(xt0,y0)).rgb;
+      vec3 c101=texture2D(u_lut,vec2(xt1,y0)).rgb;
+      vec3 c011=texture2D(u_lut,vec2(xt0,y1)).rgb;
+      vec3 c111=texture2D(u_lut,vec2(xt1,y1)).rgb;
+      vec3 c00=mix(c000,c100,f.r), c10=mix(c010,c110,f.r);
+      vec3 c01=mix(c001,c101,f.r), c11=mix(c011,c111,f.r);
+      return clamp(mix(mix(c00,c10,f.g),mix(c01,c11,f.g),f.b),0.0,1.0);
+    }
+    void main(){
+      // Fit the video inside the canvas without stretching it.
+      float videoAspect=u_videoSize.x/max(u_videoSize.y,1.0);
+      float canvasAspect=u_canvasSize.x/max(u_canvasSize.y,1.0);
+      vec2 uv=v_uv;
+      if(canvasAspect>videoAspect){ float used=videoAspect/canvasAspect; uv.x=(v_uv.x-0.5)/used+0.5; }
+      else { float used=canvasAspect/videoAspect; uv.y=(v_uv.y-0.5)/used+0.5; }
+      if(uv.x<0.0||uv.x>1.0||uv.y<0.0||uv.y>1.0){ gl_FragColor=vec4(0.035,0.037,0.043,1.0); return; }
+      vec3 src=texture2D(u_video,uv).rgb;
+      vec3 graded=src;
+      if(u_lutOn>0.5) graded=mix(src,sampleLut(src),u_strength);
+      if(u_split>0.5){
+        if(v_uv.x<u_splitPos) gl_FragColor=vec4(src,1.0);
+        else gl_FragColor=vec4(graded,1.0);
+        if(abs(v_uv.x-u_splitPos)<0.002) gl_FragColor=vec4(0.91,0.72,0.43,1.0);
+      } else gl_FragColor=vec4(graded,1.0);
+    }
+  `;
+
+  function compile(type, source) {
+    const shader = gl.createShader(type); gl.shaderSource(shader, source); gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) { const msg=gl.getShaderInfoLog(shader); gl.deleteShader(shader); throw new Error(msg); }
+    return shader;
+  }
+  function initGL() {
+    if (!gl) { $("gpuBadge").textContent="WebGL unavailable"; $("gpuBadge").classList.remove("on"); $("status").textContent="This browser does not provide WebGL. Try a current Chrome or Edge build with hardware acceleration enabled."; return false; }
+    try {
+      program=gl.createProgram(); gl.attachShader(program,compile(gl.VERTEX_SHADER,vertexShader)); gl.attachShader(program,compile(gl.FRAGMENT_SHADER,fragmentShader)); gl.linkProgram(program);
+      if(!gl.getProgramParameter(program,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
+      gl.useProgram(program);
+      positionBuffer=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,positionBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+      const pos=gl.getAttribLocation(program,"a_position"); gl.enableVertexAttribArray(pos); gl.vertexAttribPointer(pos,2,gl.FLOAT,false,0,0);
+      texture=gl.createTexture(); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,texture);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+      gl.uniform1i(gl.getUniformLocation(program,"u_video"),0);
+      lutTexture=gl.createTexture(); gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,lutTexture);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+      gl.uniform1i(gl.getUniformLocation(program,"u_lut"),1);
+      gl.activeTexture(gl.TEXTURE0);
+      $("gpuBadge").textContent="GPU LUT: WebGL ready"; $("gpuBadge").classList.add("on");
+      return true;
+    } catch(err) {
+      $("gpuBadge").textContent="WebGL setup failed"; $("status").textContent="WebGL setup error: "+err.message; return false;
+    }
+  }
+  const glReady=initGL();
+  function setUniform(name, fn, value) { const loc=gl.getUniformLocation(program,name); fn.call(gl,loc,value); }
+  function render() {
+    raf=requestAnimationFrame(render);
+    if(!glReady || !program) return;
+    const rect=canvas.getBoundingClientRect(), dpr=Math.min(window.devicePixelRatio||1,2);
+    const w=Math.max(1,Math.round(rect.width*dpr)), h=Math.max(1,Math.round(rect.height*dpr));
+    if(w!==lastW||h!==lastH){canvas.width=w;canvas.height=h;lastW=w;lastH=h;}
+    gl.viewport(0,0,w,h); gl.useProgram(program);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,texture);
+    if(video.readyState>=2 && video.videoWidth && video.videoHeight){
+      try {
+        let targetW=video.videoWidth, targetH=video.videoHeight;
+        const maxDim=playbackMode==="1080"?1920:playbackMode==="720"?1280:0;
+        if(maxDim && Math.max(targetW,targetH)>maxDim){
+          const scale=maxDim/Math.max(targetW,targetH);
+          targetW=Math.max(2,Math.round(video.videoWidth*scale/2)*2);
+          targetH=Math.max(2,Math.round(video.videoHeight*scale/2)*2);
+        }
+        if(downscaleCanvas.width!==targetW || downscaleCanvas.height!==targetH){
+          downscaleCanvas.width=targetW; downscaleCanvas.height=targetH;
+        }
+        downscaleCtx.drawImage(video,0,0,targetW,targetH);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
+        gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,gl.RGB,gl.UNSIGNED_BYTE,downscaleCanvas);
+      } catch(e) { /* browser may briefly reject a frame during source changes */ }
+    }
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,lutTexture);
+    setUniform("u_lutSize",gl.uniform1f,lutSize||2);
+    setUniform("u_domainMin",gl.uniform3fv,lutDomainMin);
+    setUniform("u_domainMax",gl.uniform3fv,lutDomainMax);
+    setUniform("u_lutOn",gl.uniform1f,(state.lutEnabled&&lutLoaded)?1:0);
+    setUniform("u_strength",gl.uniform1f,state.strength);
+    setUniform("u_split",gl.uniform1f,state.split?1:0);
+    setUniform("u_splitPos",gl.uniform1f,state.splitPos);
+    setUniform("u_videoSize",gl.uniform2fv,[video.videoWidth||16,video.videoHeight||9]);
+    setUniform("u_canvasSize",gl.uniform2fv,[w,h]);
+    gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+    gl.activeTexture(gl.TEXTURE0);
+  }
+  if(glReady) render();
+
+  function formatTime(sec) {
+    if(!Number.isFinite(sec)||sec<0) sec=0;
+    const s=Math.floor(sec); return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");
+  }
+  function setStatus(text){$("status").textContent=text;}
+  function syncLutUi(){
+    $("lutName").textContent=lutLoaded?($("lutName").dataset.name||"Loaded LUT"):"No LUT loaded";
+    $("lutStatus").textContent=lutLoaded?(state.lutEnabled?"ON":"BYPASSED"):"OFF";
+    $("lutStatus").classList.toggle("on",lutLoaded&&state.lutEnabled);
+    $("lutEnabled").disabled=!lutLoaded;
+  }
+  function parseCube(text){
+    let size=0, min=[0,0,0], max=[1,1,1], rows=[];
+    for(const raw of text.split(/\r?\n/)){
+      const line=raw.trim(); if(!line||line.startsWith("#")) continue;
+      const p=line.split(/\s+/), key=p[0].toUpperCase();
+      if(key==="TITLE") continue;
+      if(key==="LUT_3D_SIZE"){size=parseInt(p[1],10);continue;}
+      if(key==="DOMAIN_MIN"){min=p.slice(1,4).map(Number);continue;}
+      if(key==="DOMAIN_MAX"){max=p.slice(1,4).map(Number);continue;}
+      if(key==="LUT_1D_SIZE") throw new Error("This version supports 3D LUTs only. Select a .cube file with LUT_3D_SIZE.");
+      if(p.length>=3 && p.slice(0,3).every(v=>Number.isFinite(Number(v)))) rows.push(p.slice(0,3).map(Number));
+    }
+    if(!Number.isInteger(size)||size<2||size>128) throw new Error("Missing or unsupported LUT_3D_SIZE. Expected a 3D LUT size between 2 and 128.");
+    if(rows.length<size*size*size) throw new Error(`LUT data incomplete: expected ${size**3} RGB entries, found ${rows.length}.`);
+    if(rows.length>size**3) rows=rows.slice(0,size**3);
+    return {size,min,max,rows};
+  }
+  async function loadCube(file){
+    try{
+      const parsed=parseCube(await file.text());
+      // 2D atlas: each blue slice occupies one tile-width; red runs horizontally, green vertically.
+      // Texture dimensions are (size*size) by size. Each source .cube row is red-fastest, then green, then blue.
+      const width=parsed.size*parsed.size, height=parsed.size, data=new Uint8Array(width*height*4);
+      let i=0;
+      for(let b=0;b<parsed.size;b++) for(let g=0;g<parsed.size;g++) for(let r=0;r<parsed.size;r++){
+        const rgb=parsed.rows[i++], x=b*parsed.size+r, y=g, idx=(y*width+x)*4;
+        data[idx]=Math.round(Math.max(0,Math.min(1,rgb[0]))*255);
+        data[idx+1]=Math.round(Math.max(0,Math.min(1,rgb[1]))*255);
+        data[idx+2]=Math.round(Math.max(0,Math.min(1,rgb[2]))*255); data[idx+3]=255;
+      }
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,lutTexture);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT,1);
+      // UNPACK_FLIP_Y_WEBGL is global pixel-store state. The video upload uses
+      // vertical flipping, but the LUT atlas must keep its row order unchanged.
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,width,height,0,gl.RGBA,gl.UNSIGNED_BYTE,data);
+      gl.activeTexture(gl.TEXTURE0);
+      lutSize=parsed.size; lutDomainMin=parsed.min; lutDomainMax=parsed.max; lutLoaded=true;
+      $("lutName").dataset.name=file.name; $("lutDetails").textContent=`3D LUT · ${lutSize}³ · ${file.name}`;
+      state.lutEnabled=$("lutEnabled").checked=true;
+      syncLutUi(); setStatus(`Loaded ${file.name} (${lutSize}³ 3D LUT).`);
+    }catch(err){alert("Could not load LUT:\n\n"+err.message);setStatus("LUT load failed.");}
+  }
+  $("videoInput").addEventListener("change",e=>{const file=e.target.files&&e.target.files[0];if(file)loadVideo(file);e.target.value="";});
+  function loadVideo(file){
+    if(videoUrl) URL.revokeObjectURL(videoUrl);
+    currentFile=file;
+    videoUrl=URL.createObjectURL(file); video.src=videoUrl; video.load();
+    $("fileStatus").textContent=file.name; $("fileStatus").title=file.name; $("hint").style.display="none";
+    $("analysisResult").textContent="Video loaded. Run Recommend Playback to test smoothness on this computer.";
+    video.play().then(()=>setStatus("Playing "+file.name)).catch(()=>setStatus("Video loaded. Press Play to start."));
+  }
+  $("lutInput").addEventListener("change",e=>{const file=e.target.files&&e.target.files[0];if(file)loadCube(file);e.target.value="";});
+  $("clearLut").addEventListener("click",()=>{lutLoaded=false;lutSize=0;$("lutName").dataset.name="";$("lutDetails").textContent="Supports common 3D .cube LUTs with LUT_3D_SIZE.";syncLutUi();setStatus("LUT cleared.");});
+  $("playBtn").addEventListener("click",()=>{if(video.paused)video.play().catch(()=>{});else video.pause();});
+  $("stopBtn").addEventListener("click",()=>{video.pause();video.currentTime=0;});
+  video.addEventListener("play",()=>{$("playBtn").textContent="Ⅱ Pause";});
+  video.addEventListener("pause",()=>{$("playBtn").textContent="▶ Play";});
+  video.addEventListener("ended",()=>{$("playBtn").textContent="▶ Play";});
+  video.addEventListener("timeupdate",()=>{$("currentTime").textContent=formatTime(video.currentTime);$("duration").textContent=formatTime(video.duration);if(Number.isFinite(video.duration)&&video.duration>0&&!$("seek").matches(":active"))$("seek").value=String(video.currentTime/video.duration*1000);});
+  video.addEventListener("loadedmetadata",()=>{$("duration").textContent=formatTime(video.duration);setStatus(`Loaded ${video.videoWidth}×${video.videoHeight} video. Audio plays through the browser.`);});
+  video.addEventListener("error",()=>{setStatus("Could not decode this video. Try an H.264 MP4 proxy supported by Chrome/Edge.");$("hint").style.display="flex";});
+  $("seek").addEventListener("input",()=>{if(Number.isFinite(video.duration))video.currentTime=(Number($("seek").value)/1000)*video.duration;});
+  $("lutEnabled").addEventListener("change",e=>{state.lutEnabled=e.target.checked;syncLutUi();});
+  $("splitEnabled").addEventListener("change",e=>{state.split=e.target.checked;});
+  $("splitPosition").addEventListener("input",e=>{state.splitPos=Number(e.target.value)/100;$("splitValue").textContent=e.target.value+"%";});
+  $("strength").addEventListener("input",e=>{state.strength=Number(e.target.value)/100;$("strengthValue").textContent=e.target.value+"%";});
+  async function analyzePlayback(){
+    const result=$("analysisResult"), btn=$("analyzeBtn");
+    if(!video.src || !Number.isFinite(video.duration) || !video.videoWidth){
+      result.textContent="Open a video and wait for it to finish loading before running the test."; return;
+    }
+    btn.disabled=true; btn.textContent="Testing…";
+    const wasPaused=video.paused, oldTime=video.currentTime, oldRate=video.playbackRate;
+    const testStart=Math.min(Math.max(0,oldTime),Math.max(0,video.duration-5));
+    const testSeconds=Math.min(4,Math.max(1,video.duration-testStart));
+    let beforeDropped=null, afterDropped=null, beforeTotal=null, afterTotal=null;
+    try{
+      if(typeof video.getVideoPlaybackQuality==="function"){
+        const q=video.getVideoPlaybackQuality(); beforeDropped=q.droppedVideoFrames; beforeTotal=q.totalVideoFrames;
+      } else if("webkitDroppedFrameCount" in video){
+        beforeDropped=video.webkitDroppedFrameCount; beforeTotal=video.webkitDecodedFrameCount;
+      }
+      video.pause(); video.currentTime=testStart; video.playbackRate=1;
+      await new Promise((resolve,reject)=>{
+        const timer=setTimeout(resolve,testSeconds*1000);
+        const onError=()=>{clearTimeout(timer);reject(new Error("The browser reported a decoding error."));};
+        video.addEventListener("error",onError,{once:true});
+        video.play().catch(err=>{clearTimeout(timer);video.removeEventListener("error",onError);reject(err);});
+      });
+      if(typeof video.getVideoPlaybackQuality==="function"){
+        const q=video.getVideoPlaybackQuality(); afterDropped=q.droppedVideoFrames; afterTotal=q.totalVideoFrames;
+      } else if("webkitDroppedFrameCount" in video){
+        afterDropped=video.webkitDroppedFrameCount; afterTotal=video.webkitDecodedFrameCount;
+      }
+      const dropped=beforeDropped!==null&&afterDropped!==null?Math.max(0,afterDropped-beforeDropped):null;
+      const total=beforeTotal!==null&&afterTotal!==null?Math.max(0,afterTotal-beforeTotal):null;
+      const dropPct=dropped!==null&&total!==null&&total>0?100*dropped/total:null;
+      const w=video.videoWidth,h=video.videoHeight,pixels=w*h;
+      let recommendation="original", reason="";
+      if((dropPct!==null&&dropPct>=8)||pixels>=3840*2160){
+        recommendation="1080";
+        reason=dropPct!==null&&dropPct>=8?`The test dropped about ${dropPct.toFixed(1)}% of reported frames. Try 1080p processing first.`:"This is a high-resolution source. 1080p processing may reduce GPU/LUT rendering load.";
+      } else if((dropPct!==null&&dropPct>=3)||pixels>=2560*1440){
+        recommendation="1080";
+        reason=dropPct!==null&&dropPct>=3?`Some frames were dropped (${dropPct.toFixed(1)}%). 1080p processing may help.`:"This source is above 1080p. 1080p processing may reduce GPU workload.";
+      } else {
+        reason=dropPct===null?"The browser did not expose dropped-frame statistics. Original mode is a starting point; judge smoothness by eye.":`The test reported ${dropPct.toFixed(1)}% dropped frames. Original mode looks reasonable from this short test.`;
+      }
+      $("playbackMode").value=recommendation; playbackMode=recommendation;
+      const sizeMB=currentFile?(currentFile.size/1048576).toFixed(1):"unknown";
+      const dropText=dropPct===null?"dropped-frame stats unavailable":`${dropPct.toFixed(1)}% dropped frames`;
+      result.innerHTML=`<strong style="color:#e5b96f">Suggested: ${recommendation==="original"?"Original":recommendation+"p processing"}</strong><br>${w}×${h} · ${sizeMB} MB · ${dropText}<br>${reason}<br><span style="color:#8f96a2">Note: browser still decodes the source resolution. If stutter continues, use a pre-made 1080p H.264 proxy.</span>`;
+      setStatus("Playback test complete. Suggested mode: "+recommendation+".");
+    }catch(err){result.textContent="Could not complete the test: "+err.message+" Try playing the video manually.";}
+    finally{
+      video.pause(); video.currentTime=Math.min(oldTime,Math.max(0,video.duration-0.05)); video.playbackRate=oldRate;
+      if(!wasPaused) video.play().catch(()=>{});
+      btn.disabled=false; btn.textContent="⏱ Recommend Playback";
+    }
+  }
+  $("analyzeBtn").addEventListener("click",analyzePlayback);
+  $("speed").addEventListener("change",e=>video.playbackRate=Number(e.target.value));
+  $("playbackMode").addEventListener("change",e=>{
+    playbackMode=e.target.value;
+    const notes={
+      original:"Original: source frame resolution is sent to the LUT renderer.",
+      "1080":"1080p processing: downsizes decoded frames before GPU LUT rendering. The browser may still decode the original 4K/6K file.",
+      "720":"720p processing: downsizes decoded frames further before GPU LUT rendering. The browser may still decode the original 4K/6K file."
+    };
+    setStatus(notes[playbackMode]);
+  });
+  $("volume").addEventListener("input",e=>video.volume=Number(e.target.value)/100);
+  $("fullscreenBtn").addEventListener("click",()=>{const stage=$("stage");if(!document.fullscreenElement)stage.requestFullscreen?.();else document.exitFullscreen?.();});
+  document.addEventListener("keydown",e=>{
+    const tag=(document.activeElement&&document.activeElement.tagName||"").toLowerCase();
+    if(tag==="input"||tag==="select"||tag==="textarea")return;
+    if(e.code==="Space"){e.preventDefault();if(video.paused)video.play().catch(()=>{});else video.pause();}
+    else if(e.key==="ArrowLeft"){video.currentTime=Math.max(0,video.currentTime-5);}
+    else if(e.key==="ArrowRight"){video.currentTime=Math.min(video.duration||Infinity,video.currentTime+5);}
+    else if(e.key.toLowerCase()==="f")$("fullscreenBtn").click();
+  });
+  const stage=$("stage");
+  stage.addEventListener("dragover",e=>{e.preventDefault();stage.style.outline="2px solid #e5b96f";});
+  stage.addEventListener("dragleave",()=>stage.style.outline="");
+  stage.addEventListener("drop",e=>{e.preventDefault();stage.style.outline="";const f=e.dataTransfer.files[0];if(f){if(f.name.toLowerCase().endsWith(".cube"))loadCube(f);else loadVideo(f);}});
+  window.addEventListener("beforeunload",()=>{if(videoUrl)URL.revokeObjectURL(videoUrl);cancelAnimationFrame(raf);});
+  syncLutUi();
+})();
+</script>
+</body>
+</html>
