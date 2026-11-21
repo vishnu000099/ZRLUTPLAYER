@@ -1,0 +1,58 @@
+appId: app.zrplayer.lutplayer
+productName: Nikon ZR LUT Player
+copyright: Copyright © 2026 Nikon ZR LUT Player
+artifactName: "Nikon-ZR-LUT-Player-${version}-${os}-${arch}.${ext}"
+
+directories:
+  output: release
+  buildResources: build
+
+# Only the built renderer (dist/) and the Electron bundles are shipped. All npm
+# dependencies are already bundled by Vite/esbuild, so no node_modules are packed.
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - package.json
+  # Unused AI Studio source assets (78 MB) are kept in the project but not shipped.
+  - "!dist/assets/aistudio{,/**/*}"
+  - "!**/node_modules/**/*"
+npmRebuild: false
+asar: true
+compression: normal
+
+win:
+  icon: build/icon.png
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Nikon ZR LUT Player
+  artifactName: "Nikon-ZR-LUT-Player-Setup-${version}-${arch}.${ext}"
+  deleteAppDataOnUninstall: false
+
+portable:
+  artifactName: "Nikon-ZR-LUT-Player-Portable-${version}-${arch}.${ext}"
+
+mac:
+  icon: build/icon.png
+  category: public.app-category.video
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+
+dmg:
+  artifactName: "Nikon-ZR-LUT-Player-${version}-mac-${arch}.${ext}"
+  title: "Nikon ZR LUT Player ${version}"
